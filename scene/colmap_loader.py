@@ -193,11 +193,20 @@ def read_extrinsics_binary(path_to_model_file):
             qvec = np.array(binary_image_properties[1:5])
             tvec = np.array(binary_image_properties[5:8])
             camera_id = binary_image_properties[8]
-            image_name = ""
-            current_char = read_next_bytes(fid, 1, "c")[0]
-            while current_char != b"\x00":   # look for the ASCII 0 entry
-                image_name += current_char.decode("utf-8")
+            # Read image name as a null-terminated byte sequence, then decode once.
+            # Decoding per-byte fails for multi-byte UTF-8 characters (e.g., Chinese filenames).
+            name_bytes = bytearray()
+            while True:
                 current_char = read_next_bytes(fid, 1, "c")[0]
+                if current_char == b"\x00":
+                    break
+                name_bytes.extend(current_char)
+            try:
+                image_name = name_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                # Fallback: some environments may store names in a different 8-bit encoding
+                # Use latin-1 to avoid crashing; downstream code can still match filenames.
+                image_name = name_bytes.decode("latin-1")
             num_points2D = read_next_bytes(fid, num_bytes=8,
                                            format_char_sequence="Q")[0]
             x_y_id_s = read_next_bytes(fid, num_bytes=24*num_points2D,
