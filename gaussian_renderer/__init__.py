@@ -15,7 +15,7 @@ from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianR
 from scene.gaussian_model import GaussianModel
 from utils.sh_utils import eval_sh
 
-def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, separate_sh = False, override_color = None, use_trained_exp=False):
+def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, separate_sh = False, override_color = None, use_trained_exp=False, train=False, dropout_factor=0.0, sigma_noise=0.0):
     """
     Render the scene. 
     
@@ -86,6 +86,39 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
     else:
         colors_precomp = override_color
 
+    dropout_mask = None
+    if train and dropout_factor > 0.0:
+        keep_prob = max(0.0, min(1.0, 1.0 - dropout_factor))
+        dropout_mask = torch.rand(opacity.shape[0], device=opacity.device) < keep_prob
+        if not torch.any(dropout_mask):
+            # Avoid invalid rasterization with an empty Gaussian set.
+            random_idx = torch.randint(0, opacity.shape[0], (1,), device=opacity.device)
+            dropout_mask[random_idx] = True
+
+        means3D = means3D[dropout_mask]
+        means2D = means2D[dropout_mask]
+        opacity = opacity[dropout_mask]
+        if scales is not None:
+            scales = scales[dropout_mask]
+        if rotations is not None:
+            rotations = rotations[dropout_mask]
+        if cov3D_precomp is not None:
+            cov3D_precomp = cov3D_precomp[dropout_mask]
+        if colors_precomp is not None:
+            colors_precomp = colors_precomp[dropout_mask]
+        if shs is not None:
+            shs = shs[dropout_mask]
+        if separate_sh and override_color is None:
+            dc = dc[dropout_mask]
+
+    if train and sigma_noise > 0.0:
+        epsilon_opacity = torch.randn_like(opacity, device=opacity.device) * sigma_noise
+        epsilon_opacity = torch.clamp(epsilon_opacity, min=-sigma_noise, max=sigma_noise)
+        opacity = torch.clamp(opacity * (1.0 + epsilon_opacity), min=0.0, max=1.0)
+    elif (not train) and dropout_factor > 0.0:
+        # Keep train/test opacity expectation consistent when dropout is used.
+        opacity = opacity * (1.0 - dropout_factor)
+
     # Rasterize visible Gaussians to image, obtain their radii (on screen). 
     if separate_sh:
         rendered_image, radii, depth_image = rasterizer(
@@ -109,6 +142,14 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
             rotations = rotations,
             cov3D_precomp = cov3D_precomp)
         
+    if dropout_mask is not None:
+        full_radii = torch.zeros(pc.get_xyz.shape[0], device=radii.device, dtype=radii.dtype)
+        full_radii[dropout_mask] = radii
+        radii = full_radii
+        visibility_filter = radii > 0
+    else:
+        visibility_filter = radii > 0
+
     # Apply exposure to rendered image (training only)
     if use_trained_exp:
         exposure = pc.get_exposure_from_name(viewpoint_camera.image_name)
@@ -120,7 +161,7 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
     out = {
         "render": rendered_image,
         "viewspace_points": screenspace_points,
-        "visibility_filter" : (radii > 0).nonzero(),
+        "visibility_filter" : visibility_filter,
         "radii": radii,
         "depth" : depth_image
         }
