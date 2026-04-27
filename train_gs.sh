@@ -5,7 +5,7 @@
  # @LastEditors: Easonyesheng preacher@sjtu.edu.cn
  # @LastEditTime: 2026-04-18 12:52:20
  # @FilePath: /comac_proj/code/third_party/gaussian-splatting/train_gs.sh
-
+ # @Description: Training script for Gaussian Splatting
 ### 
 
 cuda_device="${CUDA_DEVICE:-0}"
