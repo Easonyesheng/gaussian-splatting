@@ -3,7 +3,7 @@
  # @Author: Easonyesheng preacher@sjtu.edu.cn
  # @Date: 2025-12-23 10:52:56
  # @LastEditors: Easonyesheng preacher@sjtu.edu.cn
- # @LastEditTime: 2026-04-18 12:52:20
+ # @LastEditTime: 2026-04-18 17:12:42
  # @FilePath: /comac_proj/code/third_party/gaussian-splatting/train_gs.sh
 
 ### 
@@ -34,8 +34,14 @@ dropout_factor=0.2
 # Opacity noise injection (paper suggests tuning per scene): 0.0 disables it.
 sigma_noise=0.0
 
-source_folder="/opt/data/private/comac_proj/data/3dgs_data/comac/40_3dgs_data/sparse_colmap" # colmap sparse
-out_folder="/opt/data/private/comac_proj/code/third_party/gaussian-splatting/output/40_colmap_sparse_drop02"
+# source_folder="/opt/data/private/comac_proj/data/3dgs_data/comac/40_3dgs_data/sparse_colmap" # colmap sparse
+# out_folder="/opt/data/private/comac_proj/code/third_party/gaussian-splatting/output/40_colmap_sparse_drop02"
+
+# source_folder="/opt/data/private/comac_proj/data/3dgs_data/comac/40_3dgs_data/vggt" # vggt
+# out_folder="/opt/data/private/comac_proj/code/third_party/gaussian-splatting/output/40_vggt_drop02"
+
+source_folder="/opt/data/private/comac_proj/data/3dgs_data/comac/40_3dgs_data/mapanything" # mapanything
+out_folder="/opt/data/private/comac_proj/code/third_party/gaussian-splatting/output/40_mapanything_drop02"
 
 CUDA_VISIBLE_DEVICES=${cuda_device} python train.py -s ${source_folder} \
                 -m ${out_folder} \
